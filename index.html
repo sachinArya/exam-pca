@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PCA Flashcards</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  body { font-family: Arial; padding: 20px; background: #0f172a; color: #e5e7eb; }
+
+  .card { 
+    background: #111827; 
+    padding: 20px; 
+    border-radius: 10px; 
+    margin-top: 20px; 
+    border: 1px solid #1e293b;
+  }
+
+  .question-number { 
+    font-weight:bold; 
+    margin-bottom:8px; 
+    color:#a5b4fc; 
+  }
+
+  .question-link {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #60a5fa;
+    word-break: break-all;
+  }
+
+  .option { 
+    margin-top: 8px; 
+    padding: 8px; 
+    border-radius: 6px; 
+    background: #1f2937; 
+  }
+
+  .correct { 
+    background: #10b981; 
+    color:#fff; 
+    font-weight:bold; 
+  }
+
+  .answer { 
+    display:none; 
+    margin-top:10px; 
+    color:#a5b4fc; 
+    font-weight:bold; 
+  }
+
+  .comments { 
+    display:none; 
+    margin-top:10px; 
+    white-space:pre-wrap; 
+    background:#1e293b; 
+    padding:10px; 
+    border-radius:8px; 
+    font-size:14px; 
+  }
+
+  button {
+    margin-top: 12px;
+    margin-right: 12px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    cursor:pointer;
+    font-weight: bold;
+  }
+
+  .primary {
+    background:#4f46e5;
+    color:white;
+  }
+
+  .primary:hover {
+    background:#4338ca;
+  }
+
+  .secondary {
+    background:#334155;
+    color:#f1f5f9;
+  }
+
+  .secondary:hover {
+    background:#475569;
+  }
+
+  #nav { margin-top:20px; }
+  #jumpInput { width:80px; padding:6px; border-radius:6px; border:none; }
+</style>
+</head>
+
+<body>
+
+<h2>PCA Flashcards</h2>
+<p>Loading <b>pca.json</b> automatically…</p>
+
+<div id="cardsContainer" style="display:none;"></div>
+
+<div id="nav" style="display:none;">
+  <button class="secondary" onclick="prevPage()">Prev Page</button>
+  <button class="primary" onclick="nextPage()">Next Page</button>
+
+  <div style="margin-top:15px;">
+    Page: <input id="jumpInput" type="number" min="1">
+    <button class="secondary" onclick="jumpToPage()">Go</button>
+    <span id="pageInfo" style="margin-left:10px;"></span>
+  </div>
+</div>
+
+<script>
+let cards = [];
+let page = 1;
+let perPage = 10;
+
+function clean(str) {
+  return (str || "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\u200B/g, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+}
+
+// Split comments per user based on your sample pattern
+function splitComments(raw) {
+  if (!raw) return ["No discussion available"];
+
+  const text = raw.replace(/\r/g, "");
+
+  const regex = /([A-Za-z0-9_]+[\s\S]*?(?:ago|Highly Voted|Selected Answer:[\s\S]*?upvoted[\s\S]*?times|Load full discussion))/g;
+
+  const matches = text.match(regex);
+  if (!matches) return [clean(text)];
+
+  return matches.map(m => clean(m));
+}
+
+// ⭐ Load pca.json automatically
+fetch("pca.json")
+  .then(r => r.json())
+  .then(json => {
+    if (!Array.isArray(json)) json = [json];
+
+    cards = json.map(item => {
+      const question = clean(item.content || "No question text found");
+      const correctLetter = clean(item.answer || "").replace(/[^A-Za-z]/g, "");
+      const options = (item.questions || []).map(opt => clean(opt));
+      const comments = splitComments(item.comments || item.discussion || "");
+      const link = item.question_link || "";
+      return { 
+        q: question, 
+        options, 
+        correctLetter, 
+        comments, 
+        link,
+        showAnswer:false, 
+        showComments:false 
+      };
+    });
+
+    document.getElementById("cardsContainer").style.display = "block";
+    document.getElementById("nav").style.display = "block";
+    renderPage();
+  })
+  .catch(err => {
+    document.body.innerHTML += "<p style='color:red;'>Error loading pca.json</p>";
+  });
+
+function getTotalPages() {
+  return Math.max(1, Math.ceil(cards.length / perPage));
+}
+
+function getPageRange() {
+  const start = (page - 1) * perPage;
+  const end = Math.min(cards.length, page * perPage);
+  return { start, end };
+}
+
+function renderPage() {
+  const container = document.getElementById("cardsContainer");
+  container.innerHTML = "";
+  const { start, end } = getPageRange();
+
+  for (let i = start; i < end; i++) {
+    const card = cards[i];
+    const cardDiv = document.createElement("div");
+    cardDiv.className = "card";
+
+    const qNum = document.createElement("div");
+    qNum.className = "question-number";
+    qNum.innerText = `Q${i + 1} (Page ${page}, #${i - start + 1})`;
+    cardDiv.appendChild(qNum);
+
+    const qText = document.createElement("div");
+    qText.innerText = card.q;
+    cardDiv.appendChild(qText);
+
+    if (card.link) {
+      const linkDiv = document.createElement("div");
+      linkDiv.className = "question-link";
+      linkDiv.innerHTML = `<a href="${card.link}" target="_blank" style="color:#60a5fa;">${card.link}</a>`;
+      cardDiv.appendChild(linkDiv);
+    }
+
+    const optionsDiv = document.createElement("div");
+    card.options.forEach(opt => {
+      const div = document.createElement("div");
+      div.className = "option";
+      div.innerText = opt;
+      optionsDiv.appendChild(div);
+    });
+    cardDiv.appendChild(optionsDiv);
+
+    const answerDiv = document.createElement("div");
+    answerDiv.className = "answer";
+    answerDiv.innerText = "Correct Answer: " + card.correctLetter;
+    answerDiv.style.display = card.showAnswer ? "block" : "none";
+    cardDiv.appendChild(answerDiv);
+
+    const commentsDiv = document.createElement("div");
+    commentsDiv.className = "comments";
+    commentsDiv.innerHTML = card.comments.map(c => "• " + c).join("\n\n");
+    commentsDiv.style.display = card.showComments ? "block" : "none";
+    cardDiv.appendChild(commentsDiv);
+
+    const btnContainer = document.createElement("div");
+    btnContainer.style.marginTop = "12px";
+
+    const btnAnswer = document.createElement("button");
+    btnAnswer.className = "primary";
+    btnAnswer.innerText = card.showAnswer ? "Hide Answer" : "Reveal Answer";
+    btnAnswer.onclick = () => {
+      card.showAnswer = !card.showAnswer;
+      renderPage();
+    };
+    btnContainer.appendChild(btnAnswer);
+
+    const btnComments = document.createElement("button");
+    btnComments.className = "secondary";
+    btnComments.innerText = card.showComments ? "Hide Comments" : "Show Comments";
+    btnComments.onclick = () => {
+      card.showComments = !card.showComments;
+      renderPage();
+    };
+    btnContainer.appendChild(btnComments);
+
+    cardDiv.appendChild(btnContainer);
+
+    if (card.showAnswer) {
+      Array.from(optionsDiv.children).forEach(div => {
+        const txt = div.innerText.toUpperCase();
+        const letters = card.correctLetter.toUpperCase().split("");
+        if (letters.some(l => txt.startsWith(l + "."))) {
+          div.classList.add("correct");
+        }
+      });
+    }
+
+    container.appendChild(cardDiv);
+  }
+
+  document.getElementById("pageInfo").innerText =
+    `Page ${page} of ${getTotalPages()} (Questions ${start + 1}–${end})`;
+}
+
+function nextPage() {
+  if (page < getTotalPages()) {
+    page++;
+    renderPage();
+  }
+}
+
+function prevPage() {
+  if (page > 1) {
+    page--;
+    renderPage();
+  }
+}
+
+function jumpToPage() {
+  const p = parseInt(document.getElementById("jumpInput").value);
+  const total = getTotalPages();
+  if (!isNaN(p) && p >= 1 && p <= total) {
+    page = p;
+    renderPage();
+  }
+}
+</script>
+
+</body>
+</html>
